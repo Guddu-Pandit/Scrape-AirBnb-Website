@@ -184,21 +184,42 @@ const data = await page.evaluate(() => {
       card.querySelector("h2, h3")?.innerText ||
       "N/A";
 
+    // DESCRIPTION
+    const description =
+      card.querySelector('[itemprop="description"]')?.content ||
+      card.querySelector('div[role="group"]')?.innerText ||
+      "N/A";
+
     // PRICE
     let price = null;
     const priceText =
       card.innerText.match(/₹\s?[\d,]+|\$\s?[\d,]+|€\s?[\d,]+/)?.[0];
     if (priceText) price = priceText;
 
+    // RATING
+    let rating = null;
+    const ratingText = card.querySelector('[aria-label*="rating"], [aria-label*="stars"]')?.getAttribute("aria-label") ||
+                       card.querySelector('span[aria-hidden="true"]')?.innerText;
+    if (ratingText) {
+      const match = ratingText.match(/[\d.]+/);
+      if (match) rating = match[0];
+    }
+
     results.push({
       title,
+      description,
       price,
+      rating,
       link,
     });
   }
 
   return results;
 });
+
+
+console.log("✅ Data successfully saved to output.json");
+
 
   console.log("\n📦 FINAL JSON OUTPUT\n");
   console.log(JSON.stringify(data, null, 2));
