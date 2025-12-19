@@ -1,5 +1,7 @@
 import { chromium } from "playwright";
 import readline from "readline";
+import fs from "fs";
+
 
 // ---------- USER INPUT ----------
 const rl = readline.createInterface({
@@ -156,29 +158,58 @@ async function closeAirbnbGotItPopup(page) {
   await smartScroll(page);
 
   // ---------- EXTRACT AFTER POPUP ----------
-  await page.waitForSelector("a[href*='/rooms/']", { timeout: 20000 });
+ // ---------- EXTRACT AFTER POPUP ----------
+await page.waitForSelector('div[itemprop="itemListElement"]', { timeout: 20000 });
 
-  const data = await page.evaluate(() => {
-    return Array.from(
-      document.querySelectorAll("a[href*='/rooms/']")
-    )
-      .slice(0, 4)
-      .map(card => {
-        const text = card.innerText || "";
-        const price =
-          text.match(/₹\s?[\d,]+|\$\s?[\d,]+|€\s?[\d,]+/)?.[0] || null;
-        const title = text.split("\n")[0];
+const data = await page.evaluate(() => {
+  const results = [];
+  const seen = new Set();
 
-        return {
-          title,
-          price,
-          link: card.href,
-        };
-      });
-  });
+  const cards = document.querySelectorAll('div[itemprop="itemListElement"]');
+
+  for (const card of cards) {
+    if (results.length >= 4) break;
+
+    const linkEl = card.querySelector('a[href*="/rooms/"]');
+    if (!linkEl) continue;
+
+    const link = linkEl.href;
+    const roomId = link.match(/rooms\/(\d+)/)?.[1];
+    if (!roomId || seen.has(roomId)) continue;
+    seen.add(roomId);
+
+    // TITLE
+    const title =
+      card.querySelector('meta[itemprop="name"]')?.content ||
+      card.querySelector("h2, h3")?.innerText ||
+      "N/A";
+
+    // PRICE
+    let price = null;
+    const priceText =
+      card.innerText.match(/₹\s?[\d,]+|\$\s?[\d,]+|€\s?[\d,]+/)?.[0];
+    if (priceText) price = priceText;
+
+    results.push({
+      title,
+      price,
+      link,
+    });
+  }
+
+  return results;
+});
 
   console.log("\n📦 FINAL JSON OUTPUT\n");
   console.log(JSON.stringify(data, null, 2));
+  fs.writeFileSync(
+  "output.json",
+  JSON.stringify(data, null, 2),
+  "utf-8"
+);
+
+console.log("✅ Data successfully saved to output.json");
+
 
   await browser.close();
 })();
